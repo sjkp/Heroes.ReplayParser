@@ -7,6 +7,8 @@ namespace Heroes.ReplayParser
 
     public static class ReplayDetails
     {
+        public const string FileName = "replay.details";
+
         /// <summary> Parses the replay.details file, applying it to a Replay object. </summary>
         /// <param name="replay"> The replay object to apply the parsed information to. </param>
         /// <param name="buffer"> The buffer containing the replay.details file. </param>
@@ -16,7 +18,6 @@ namespace Heroes.ReplayParser
                 using (var reader = new BinaryReader(stream))
                 {
                     var replayDetailsStructure = new TrackerEventStructure(reader);
-
                     replay.Players = replayDetailsStructure.dictionary[0].optionalData.array.Select(i => new Player
                     {
                         Name = i.dictionary[0].blobText,
@@ -30,27 +31,20 @@ namespace Heroes.ReplayParser
                         Handicap = (int)i.dictionary[6].vInt.Value,
                         // [7] = VInt, Default 0
                         IsWinner = i.dictionary[8].vInt.Value == 1,
-                        // [9] = Player Number (0 - 9)
+                        // [9] = Sometimes player index in ClientList array; usually 0-9, but can be higher if there are observers. I don't fully understand this, as this was incorrect in at least one Custom game, where this said ClientList[8] was null
                         Character = i.dictionary[10].blobText
                     }).ToArray();
 
-                    if (replay.Players.Length != 10)
+                    if (replay.Players.Length != 10 || replay.Players.Count(i => i.IsWinner) != 5)
                         // Try Me Mode, or something strange
                         return;
 
-                    var playerIndexes = replay.TrackerEvents.Where(i => i.TrackerEventType == ReplayTrackerEvents.TrackerEventType.PlayerSetupEvent && i.Data.dictionary[2].optionalData != null).Select(i => i.Data.dictionary[2].optionalData.vInt.Value).OrderBy(i => i).ToArray();
-                    for (var i = 0; i < playerIndexes.Length; i++)
-                        // The references between both of these classes are the same on purpose.
-                        // We want updates to one to propogate to the other.
-                        replay.ClientList[playerIndexes[i]] = replay.Players[i];
-
                     replay.Map = replayDetailsStructure.dictionary[1].blobText;
-                    // [2] - This is typically an empty string, no need to decode.
-                    // [3] - Blob: "Minimap.tga" or "CustomMiniMap.tga"
-                    // [4] - Uint, Default 1
-
-                    // [5] - Utc Timestamp
-                    replay.Timestamp = DateTime.FromFileTimeUtc(replayDetailsStructure.dictionary[5].vInt.Value);
+                    // [2] - m_difficulty
+                    // [3] - m_thumbnail - "Minimap.tga", "CustomMiniMap.tga", etc
+                    // [4] - m_isBlizzardMap
+                    
+                    replay.Timestamp = DateTime.FromFileTimeUtc(replayDetailsStructure.dictionary[5].vInt.Value); // m_timeUTC
 
                     // There was a bug during the below builds where timestamps were buggy for the Mac build of Heroes of the Storm
                     // The replay, as well as viewing these replays in the game client, showed years such as 1970, 1999, etc
@@ -60,20 +54,17 @@ namespace Heroes.ReplayParser
                     else if (replay.ReplayBuild == 34190 && replay.Timestamp < new DateTime(2015, 2, 15))
                         replay.Timestamp = new DateTime(2015, 2, 20);
 
-                    // [6] - Windows replays, this is Utc offset.  Mac replays, this is actually the entire Local Timestamp
-                    // var potentialUtcOffset = new TimeSpan(replayDetailsStructure.dictionary[6].vInt.Value);
-                    // Console.WriteLine(potentialUtcOffset.ToString());
-
-                    // [7] - Blob, Empty String
-                    // [8] - Blob, Empty String
-                    // [9] - Blob, Empty String
-                    // [10] - Optional, Array: 0 - Blob, "s2ma"
-                    // [11] - UInt, Default 0
-                    // [12] - VInt, Default 4
-                    // [13] - VInt, Default 1 or 7
-                    // [14] - Optional, Null
-                    // [15] - VInt, Default 0
-                    // [16] - Optional, UInt, Default 0
+                    // [6] - m_timeLocalOffset - For Windows replays, this is Utc offset.  For Mac replays, this is actually the entire Local Timestamp
+                    // [7] - m_description - Empty String
+                    // [8] - m_imageFilePath - Empty String
+                    // [9] - m_mapFileName - Empty String
+                    // [10] - m_cacheHandles - "s2ma"
+                    // [11] - m_miniSave - 0
+                    // [12] - m_gameSpeed - 4
+                    // [13] - m_defaultDifficulty - Usually 1 or 7
+                    // [14] - m_modPaths - Null
+                    // [15] - m_campaignIndex - 0
+                    // [16] - m_restartAsTransitionMap - 0
                 }
         }
     }

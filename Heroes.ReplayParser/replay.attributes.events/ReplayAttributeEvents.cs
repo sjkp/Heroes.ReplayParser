@@ -8,6 +8,8 @@ namespace Heroes.ReplayParser
 
     public class ReplayAttributeEvents
     {
+        public const string FileName = "replay.attributes.events";
+
         public ReplayAttribute[] Attributes { get; set; }
 
         public static void Parse(Replay replay, byte[] buffer)
@@ -23,8 +25,7 @@ namespace Heroes.ReplayParser
             for (int i = 0; i < numAttributes; i++)
                 attributes[i] = ReplayAttribute.Parse(buffer, initialOffset + (i*13));
 
-            var rae = new ReplayAttributeEvents { Attributes = attributes };
-            rae.ApplyAttributes(replay);
+            new ReplayAttributeEvents { Attributes = attributes.OrderBy(i => i.AttributeType).ToArray() }.ApplyAttributes(replay);
 
             /* var stringList = attributes.OrderBy(i => i.AttributeType);
             Console.WriteLine(stringList.Count()); */
@@ -48,16 +49,16 @@ namespace Heroes.ReplayParser
             foreach (var attribute in Attributes)
                 switch (attribute.AttributeType)
                 {
-                    case ReplayAttributeEventType.PlayerTypeAttribute: // 500
+                    case ReplayAttributeEventType.PlayerTypeAttribute:
                         {
-                            var type = encoding.GetString(attribute.Value.Reverse().ToArray());
+                            var type = encoding.GetString(attribute.Value.Reverse().ToArray()).ToLower();
 
-                            if (type.ToLower().Equals("comp"))
+                            if (type == "comp")
                                 replay.Players[attribute.PlayerId - 1].PlayerType = PlayerType.Computer;
-                            else if (type.ToLower().Equals("humn"))
+                            else if (type == "humn")
                                 replay.Players[attribute.PlayerId - 1].PlayerType = PlayerType.Human;
                             else
-                                throw new Exception("Unexpected value");
+                                throw new Exception("Unexpected value for PlayerType");
 
                             break;
                         }
@@ -71,28 +72,25 @@ namespace Heroes.ReplayParser
 
                     case ReplayAttributeEventType.DifficultyLevelAttribute:
                         {
-                            var diffLevel = encoding.GetString(attribute.Value.Reverse().ToArray()).ToLower();
+                            var diffLevel = encoding.GetString(attribute.Value.Reverse().ToArray());
                             var player = replay.Players[attribute.PlayerId - 1];
 
                             switch (diffLevel)
                             {
-                                case "vyey":
-                                    player.Difficulty = Difficulty.VeryEasy;
+                                case "VyEy":
+                                    player.Difficulty = Difficulty.Beginner;
                                     break;
-                                case "easy":
-                                    player.Difficulty = Difficulty.Easy;
+                                case "Easy":
+                                    player.Difficulty = Difficulty.Recruit;
                                     break;
-                                case "medi":
-                                    player.Difficulty = Difficulty.Medium;
+                                case "Medi":
+                                    player.Difficulty = Difficulty.Adept;
                                     break;
-                                case "hard":
-                                    player.Difficulty = Difficulty.Hard;
+                                case "HdVH":
+                                    player.Difficulty = Difficulty.Veteran;
                                     break;
-                                case "vyhd":
-                                    player.Difficulty = Difficulty.VeryHard;
-                                    break;
-                                case "insa":
-                                    player.Difficulty = Difficulty.Insane;
+                                case "VyHd":
+                                    player.Difficulty = Difficulty.Elite;
                                     break;
                             }
 
@@ -160,9 +158,7 @@ namespace Heroes.ReplayParser
 
                     case ReplayAttributeEventType.GameTypeAttribute:
                         {
-                            var gameTypeStr = encoding.GetString(attribute.Value.Reverse().ToArray()).ToLower().Trim('\0');
-
-                            switch (gameTypeStr)
+                            switch (encoding.GetString(attribute.Value.Reverse().ToArray()).ToLower().Trim('\0'))
                             {
                                 case "priv":
                                     replay.GameMode = GameMode.Custom;
@@ -178,12 +174,12 @@ namespace Heroes.ReplayParser
                             break;
                         }
 
-                    case ReplayAttributeEventType.Character:
+                    case ReplayAttributeEventType.Hero:
                         {
                             replay.Players[attribute.PlayerId - 1].IsAutoSelect = encoding.GetString(attribute.Value.Reverse().ToArray()) == "Rand";
                             break;
                         }
-                        
+
                     case ReplayAttributeEventType.CharacterLevel:
                         {
                             var characterLevel = int.Parse(encoding.GetString(attribute.Value.Reverse().ToArray()));
@@ -193,7 +189,7 @@ namespace Heroes.ReplayParser
                             break;
                         }
 
-                    case ReplayAttributeEventType.HeroSelectionMode:
+                    case ReplayAttributeEventType.LobbyMode:
                         {
                             if (replay.GameMode != GameMode.Custom)
                                 switch (encoding.GetString(attribute.Value.Reverse().ToArray()).ToLower().Trim('\0'))
@@ -207,7 +203,10 @@ namespace Heroes.ReplayParser
                                 }
                         }
                         break;
-
+                    case ReplayAttributeEventType.ReadyMode:
+                        if (replay.GameMode == GameMode.HeroLeague && encoding.GetString(attribute.Value.Reverse().ToArray()).ToLower().Trim('\0') == "fcfs")
+                            replay.GameMode = GameMode.TeamLeague;
+                        break;
                     case (ReplayAttributeEventType)4011: // What is this? Draft order?
                         break;
                     case (ReplayAttributeEventType)4016: // What is this? Always '1' in Hero League
@@ -237,14 +236,15 @@ namespace Heroes.ReplayParser
                 foreach (var att in currentList)
                     // Reverse the values then parse, you don't notice the effects of this until theres 10+ teams o.o
                     replay.Players[att.PlayerId - 1].Team = int.Parse(encoding.GetString(att.Value.Reverse().ToArray()).Trim('\0', 'T'));
-
-            // Skipping parsing the handicap and colors since this is parsed elsewhere.
         }
 
         public enum ReplayAttributeEventType
         {
             PlayerTypeAttribute = 500,
+            Rules = 1000,
+            IsPremadeGame = 1001,
 
+            /* 2000 - 2024 are related to team sizes */
             TeamSizeAttribute = 2001,
             PlayerTeam1v1Attribute = 2002,
             PlayerTeam2v2Attribute = 2003,
@@ -254,23 +254,45 @@ namespace Heroes.ReplayParser
 
             GameSpeedAttribute = 3000,
             PlayerRaceAttribute = 3001,
-            PlayerColorIndexAttribute = 3002,
+            TeamColorIndexAttribute = 3002,
             PlayerHandicapAttribute = 3003,
             DifficultyLevelAttribute = 3004,
-
+            ComputerRace = 3005,
+            LobbyDelay = 3006,
+            ParticipantRole = 3007,
+            WatcherType = 3008,
             GameTypeAttribute = 3009,
+            LockedAlliances = 3010,
+            PlayerLogo = 3011,
+            TandemLeader = 3012,
+            Commander = 3013,
+            CommanderLevel = 3014,
+            GameDuration = 3015,
+            /* 3100 - 3300 are related to AI builds (for Starcraft 2) */
 
-            Character = 4002,
+            PrivacyOption = 4000,
+            UsingCustomObserverUI = 4001,
+            Hero = 4002,
+            SkinAndSkinTint = 4003,
+            MountAndMountTint = 4004,
+            Ready = 4005,
+            HeroRange = 4006,
+            HeroRole = 4007,
             CharacterLevel = 4008,
+            CanReady = 4009,
+            LobbyMode = 4010,
+            ReadyOrder = 4011,
+            ReadyingTeam = 4012,
+            HeroDuplicates = 4013,
+            HeroVisibility = 4014,
+            LobbyPhase = 4015,
+            ReadyingCount = 4016,
+            ReadyingRound = 4017,
+            ReadyMode = 4018,
+            ReadyRequirements = 4019,
+            FirstReadyingTeam = 4020
 
-            HeroSelectionMode = 4010
+            /* 4100 - 4200 are related to Artifacts, no longer in the game */
         }
-
-        /*  4006 'rang', 'mele'
-            4004 -> mount, potentially mount color
-            4003 -> potentially skin or skin color
-            4007 -> 'spec', 'warr', 'assa'
-            4100 -> 'Cool', 'APwr', 'ADmg', 'MaxH'
-            4102 -> 'Move', 'MaxM' */
     }
 }

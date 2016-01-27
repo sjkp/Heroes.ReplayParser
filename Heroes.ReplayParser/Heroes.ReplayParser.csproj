@@ -19,7 +19,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>bin\Debug - 2010\</OutputPath>
+    <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -64,13 +64,15 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Difficulty.cs" />
     <Compile Include="GameSpeed.cs" />
     <Compile Include="GameMode.cs" />
     <Compile Include="TimelineEvent.cs" />
-    <Compile Include="Location.cs" />
+    <Compile Include="replay.resumable.events\ReplayResumableEvents.cs" />
+    <Compile Include="Unit.cs" />
     <Compile Include="mpq.header\MpqHeader.cs" />
     <Compile Include="Player.cs" />
     <Compile Include="PlayerType.cs" />
@@ -83,9 +85,9 @@
     <Compile Include="replay.details\ReplayDetails.cs" />
     <Compile Include="replay.game.events\ReplayGameEvents.cs" />
     <Compile Include="replay.initData\ReplayInitData.cs" />
-    <Compile Include="replay.messages.events\ChatMessage.cs" />
-    <Compile Include="replay.messages.events\ChatMessageTarget.cs" />
-    <Compile Include="replay.messages.events\ReplayMessageEvents.cs" />
+    <Compile Include="replay.message.events\ChatMessage.cs" />
+    <Compile Include="replay.message.events\ChatMessageTarget.cs" />
+    <Compile Include="replay.message.events\ReplayMessageEvents.cs" />
     <Compile Include="replay.server.battlelobby\ReplayServerBattlelobby.cs" />
     <Compile Include="replay.tracker.events\ReplayTrackerEvents.cs" />
     <Compile Include="Streams\BitReader.cs" />
